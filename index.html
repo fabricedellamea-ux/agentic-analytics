@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic Analytics | Contact Center Flow</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #4f46e5 60%, #7c3aed 100%);
+      color: white;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+    .header-icon {
+      width: 42px; height: 42px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    header p  { font-size: 13px; opacity: 0.75; margin-top: 2px; }
+    .badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .header-controls {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .header-controls select {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+    .header-controls select option { background: #1e3a8a; }
+
+    /* ── Stats Row ───────────────────────────────────────────── */
+    .stats-row {
+      display: flex;
+      gap: 14px;
+      padding: 20px 40px;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      overflow-x: auto;
+    }
+    .stat-card {
+      flex: 1;
+      min-width: 150px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1.5px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: currentColor;
+      opacity: 0.6;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      opacity: 0.6;
+      margin-bottom: 6px;
+    }
+    .stat-card .value { font-size: 28px; font-weight: 800; line-height: 1; }
+    .stat-card .sub   { font-size: 12px; opacity: 0.55; margin-top: 5px; }
+
+    /* ── Main Content ────────────────────────────────────────── */
+    .main {
+      padding: 28px 40px;
+    }
+    .panel {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 18px 24px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .panel-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .panel-header .desc {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-left: 4px;
+    }
+
+    /* ── Column Headers ──────────────────────────────────────── */
+    .col-headers {
+      display: flex;
+      padding: 16px 24px 0;
+      gap: 0;
+    }
+    .col-header {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 6px 8px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .col-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── SVG / Sankey ────────────────────────────────────────── */
+    .chart-wrap {
+      padding: 8px 24px 24px;
+      overflow-x: auto;
+    }
+
+    .node-rect { cursor: pointer; }
+    .link { fill: none; }
+    .link:hover { opacity: 0.65 !important; }
+
+    /* ── Legend ─────────────────────────────────────────────── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      padding: 16px 24px 20px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #475569;
+      font-weight: 500;
+    }
+    .legend-swatch {
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .legend-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      padding-top: 2px;
+      width: 100%;
+    }
+
+    /* ── Tooltip ─────────────────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      background: #0f172a;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+      z-index: 9999;
+      max-width: 240px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      line-height: 1.5;
+    }
+    #tooltip .tip-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    #tooltip .tip-count { font-size: 18px; font-weight: 800; }
+    #tooltip .tip-pct   { color: #94a3b8; font-size: 12px; }
+    #tooltip .tip-of    { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    /* ── Flow note box ───────────────────────────────────────── */
+    .note-box {
+      margin: 0 40px 24px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      color: #1e40af;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .note-box strong { display: block; font-weight: 700; margin-bottom: 2px; }
+
+    /* ── Transfer breakdown row ──────────────────────────────── */
+    .breakdown-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 40px;
+    }
+    .breakdown-label {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 12px 20px 12px 0;
+      border-right: 2px solid #e2e8f0;
+      margin-right: 20px;
+      min-width: 180px;
+      flex-shrink: 0;
+    }
+    .breakdown-label .bl-eyebrow {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      margin-bottom: 3px;
+    }
+    .breakdown-label .bl-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      line-height: 1.3;
+    }
+    .breakdown-cards {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      padding: 12px 0;
+    }
+    .bc-card {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .bc-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .bc-body {}
+    .bc-card .bc-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      opacity: 0.6;
+      margin-bottom: 2px;
+    }
+    .bc-card .bc-value {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .bc-card .bc-sub {
+      font-size: 11px;
+      opacity: 0.55;
+      margin-top: 3px;
+    }
+    .bc-divider {
+      display: flex;
+      align-items: center;
+      color: #cbd5e1;
+      font-size: 20px;
+      font-weight: 300;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+<header>
+  <div class="header-icon">📊</div>
+  <div>
+    <h1>Agentic Analytics <span class="badge">LIVE</span></h1>
+    <p>Contact Center · AI Bot Experience · Call Flow Breakdown</p>
+  </div>
+  <div class="header-controls">
+    <select id="rangeSelect">
+      <option>Last 7 days</option>
+      <option selected>Last 30 days</option>
+      <option>Last quarter</option>
+      <option>Custom range</option>
+    </select>
+  </div>
+</header>
+
+<!-- ══════════════════════════════ STATS ROW ═════════════════════════════ -->
+<div class="stats-row" id="statsRow"></div>
+
+<!-- ══════════════════════════ TRANSFER BREAKDOWN ROW ════════════════════ -->
+<div class="breakdown-row">
+  <div class="breakdown-label">
+    <div class="bl-eyebrow">Of escalated calls</div>
+    <div class="bl-title">Bot Experience Interruption Split</div>
+  </div>
+  <div class="breakdown-cards" id="breakdownCards"></div>
+</div>
+
+<!-- ══════════════════════════════ NOTE ══════════════════════════════════ -->
+<div class="note-box" style="margin-top:24px">
+  <span style="font-size:18px;margin-top:-1px">ℹ️</span>
+  <div>
+    <strong>How to read this chart</strong>
+    Each band's width is proportional to the number of calls it represents.
+    Follow any band left-to-right to trace the journey of that call segment through the contact center.
+    All volumes are mutually exclusive — every call is counted exactly once.
+  </div>
+</div>
+
+<!-- ══════════════════════════════ PANEL ═════════════════════════════════ -->
+<div class="main">
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Call Flow — Inbound → Bot → Human</h2>
+      <span class="desc">Hover over any node or band for details</span>
+    </div>
+
+    <!-- Column headers injected by JS -->
+    <div class="col-headers" id="colHeaders"></div>
+
+    <div class="chart-wrap">
+      <svg id="sankey"></svg>
+    </div>
+
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- ═══════════════════════════════ SCRIPT ═══════════════════════════════ -->
+<script>
+// ── 1. DATA MODEL ─────────────────────────────────────────────────────────
+// Swap these numbers for real data at any time.
+const DATA = {
+  total: 10000,
+  contained: {
+    total:     6000,
+    resolved:  3600,
+    abandoned: 1800,
+    unknown:    600,
+  },
+  transferred: {
+    total: 4000,
+    // How the transfer was initiated
+    byType: {
+      fullBotExp:          1600,  // bot fully qualified, then handed off
+      customerRequested:   1200,  // customer pressed "talk to agent"
+      botDecided:          1200,  // bot didn't have an answer, self-escalated
+    },
+    // What happened once with the human agent
+    outcomes: {
+      resolved:   2000,
+      unresolved:  800,
+      abandoned:   800,
+      unknown:     400,
+    },
+  },
+};
+
+// ── 2. COLOUR PALETTE ──────────────────────────────────────────────────────
+const C = {
+  inbound:      '#2563eb',
+  contained:    '#7c3aed',
+  transferred:  '#d97706',
+  fullBot:      '#f59e0b',
+  custReq:      '#f97316',
+  botDecided:   '#dc7a1a',
+  resolved:     '#059669',
+  unresolved:   '#b91c1c',
+  abandoned:    '#6b7280',
+  unknown:      '#94a3b8',
+};
+
+// ── 3. DERIVED HELPERS ─────────────────────────────────────────────────────
+function pct(val, of) { return (val / of * 100).toFixed(1) + '%'; }
+function fmt(n)        { return n.toLocaleString(); }
+
+const T = DATA.transferred;
+const typeWeights = {
+  full: T.byType.fullBotExp        / T.total,
+  cust: T.byType.customerRequested / T.total,
+  bot:  T.byType.botDecided        / T.total,
+};
+
+// Distribute human outcomes across the three transfer-type nodes proportionally
+function split(outcomeVal, weight) { return Math.round(outcomeVal * weight); }
+
+// ── 4. SUMMARY STATS ──────────────────────────────────────────────────────
+const STATS = [
+  {
+    label: 'Total Inbound Calls',
+    value: fmt(DATA.total),
+    sub:   '100% of traffic',
+    color: C.inbound,
+    bg:    '#eff6ff',
+  },
+  {
+    label: 'Bot Contained',
+    value: fmt(DATA.contained.total),
+    sub:   pct(DATA.contained.total, DATA.total) + ' of inbound',
+    color: C.contained,
+    bg:    '#f5f3ff',
+  },
+  {
+    label: 'Escalated to Human',
+    value: fmt(T.total),
+    sub:   pct(T.total, DATA.total) + ' of inbound',
+    color: C.transferred,
+    bg:    '#fffbeb',
+  },
+  {
+    label: 'Resolved by Bot',
+    value: pct(DATA.contained.resolved, DATA.total),
+    sub:   fmt(DATA.contained.resolved) + ' calls — autonomous resolution',
+    color: C.contained,
+    bg:    '#f5f3ff',
+    badge: 'BOT',
+    badgeColor: C.contained,
+  },
+  {
+    label: 'Resolved by Human',
+    value: pct(T.outcomes.resolved, DATA.total),
+    sub:   fmt(T.outcomes.resolved) + ' calls — after escalation',
+    color: C.resolved,
+    bg:    '#f0fdf4',
+    badge: 'HUMAN',
+    badgeColor: C.resolved,
+  },
+];
+
+const statsRow = document.getElementById('statsRow');
+STATS.forEach(s => {
+  const badgeHtml = s.badge
+    ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:0.06em;background:${s.badgeColor};color:white;vertical-align:middle">${s.badge}</span>`
+    : '';
+  statsRow.insertAdjacentHTML('beforeend', `
+    <div class="stat-card" style="background:${s.bg};border-color:${s.color}33;color:${s.color}">
+      <div class="label">${s.label}</div>
+      <div class="value">${s.value}${badgeHtml}</div>
+      <div class="sub">${s.sub}</div>
+    </div>`);
+});
+
+// ── 4b. TRANSFER BREAKDOWN ROW ────────────────────────────────────────────
+const interrupted = T.byType.customerRequested + T.byType.botDecided;
+const fullBotTransfer = T.byType.fullBotExp;
+
+const BREAKDOWN_CARDS = [
+  {
+    icon: '🤖',
+    iconBg: '#fef3c7',
+    label: 'Full Bot Experience → Human',
+    value: fmt(fullBotTransfer),
+    valueSub: pct(fullBotTransfer, T.total) + ' of escalated · ' + pct(fullBotTransfer, DATA.total) + ' of inbound',
+    color: C.fullBot,
+    bg: '#fffbeb',
+    tooltip: 'Customer went through the complete bot experience before being transferred',
+  },
+  {
+    icon: '⚡',
+    iconBg: '#fee2e2',
+    label: 'Interrupted Bot Experience',
+    value: fmt(interrupted),
+    valueSub: pct(interrupted, T.total) + ' of escalated · ' + pct(interrupted, DATA.total) + ' of inbound',
+    color: C.unresolved,
+    bg: '#fff1f2',
+    tooltip: `Customer Requested (${fmt(T.byType.customerRequested)}) + Bot Self-Escalated (${fmt(T.byType.botDecided)})`,
+    breakdown: [
+      { label: 'Customer requested agent', value: fmt(T.byType.customerRequested), pct: pct(T.byType.customerRequested, interrupted) },
+      { label: 'Bot self-escalated (no answer)', value: fmt(T.byType.botDecided), pct: pct(T.byType.botDecided, interrupted) },
+    ],
+  },
+];
+
+const breakdownEl = document.getElementById('breakdownCards');
+BREAKDOWN_CARDS.forEach((card, i) => {
+  if (i === 1) {
+    breakdownEl.insertAdjacentHTML('beforeend', `<div class="bc-divider">vs</div>`);
+  }
+  const breakdownHtml = card.breakdown
+    ? card.breakdown.map(b => `
+        <span style="display:inline-flex;align-items:center;gap:5px;margin-right:10px;font-size:10px;color:#64748b;font-weight:600">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${card.color};opacity:0.7"></span>
+          ${b.label}: <strong>${b.value}</strong> (${b.pct})
+        </span>`).join('')
+    : '';
+  breakdownEl.insertAdjacentHTML('beforeend', `
+    <div class="bc-card" style="background:${card.bg};border-color:${card.color}44;color:${card.color}" title="${card.tooltip}">
+      <div class="bc-icon" style="background:${card.iconBg}">${card.icon}</div>
+      <div class="bc-body">
+        <div class="bc-label">${card.label}</div>
+        <div class="bc-value">${card.value}</div>
+        <div class="bc-sub">${card.valueSub}</div>
+        ${breakdownHtml ? `<div style="margin-top:5px">${breakdownHtml}</div>` : ''}
+      </div>
+    </div>`);
+});
+
+// ── 5. COLUMN HEADERS ─────────────────────────────────────────────────────
+const COL_DEFS = [
+  { label: 'Inbound',          color: C.inbound },
+  { label: 'Bot Routing',      color: C.contained },
+  { label: 'Transfer Type / Bot Outcome', color: C.transferred },
+  { label: 'Human Outcome',    color: C.resolved },
+];
+
+const colHeaders = document.getElementById('colHeaders');
+COL_DEFS.forEach(h => {
+  colHeaders.insertAdjacentHTML('beforeend', `
+    <div class="col-header" style="color:${h.color};background:${h.color}11">
+      <span class="dot" style="background:${h.color}"></span>
+      ${h.label}
+    </div>`);
+});
+
+// ── 6. SANKEY GRAPH DEFINITION ────────────────────────────────────────────
+//  Node IDs
+//  0  Inbound
+//  1  Contained
+//  2  Transferred
+//  3  Bot-Resolved       (contained outcome)
+//  4  Bot-Abandoned      (contained outcome)
+//  5  Bot-Unknown        (contained outcome)
+//  6  Full Bot Exp       (transfer type)
+//  7  Customer Requested (transfer type)
+//  8  Bot Decided        (transfer type)
+//  9  Human Resolved     (human outcome)
+// 10  Human Unresolved   (human outcome)
+// 11  Human Abandoned    (human outcome)
+// 12  Human Unknown      (human outcome)
+
+const sankeyNodes = [
+  { id: 0,  name: 'Inbound Calls',              color: C.inbound },
+  { id: 1,  name: 'Contained by Bot',           color: C.contained },
+  { id: 2,  name: 'Transferred to Human',       color: C.transferred },
+  { id: 3,  name: 'Resolved (bot)',              color: C.resolved },
+  { id: 4,  name: 'Abandoned (bot)',             color: C.abandoned },
+  { id: 5,  name: 'Unknown (bot)',               color: C.unknown },
+  { id: 6,  name: 'Full Bot Experience',         color: C.fullBot },
+  { id: 7,  name: 'Customer Requested Agent',    color: C.custReq },
+  { id: 8,  name: 'Bot Self-Escalated',          color: C.botDecided },
+  { id: 9,  name: 'Resolved (human)',            color: C.resolved },
+  { id: 10, name: 'Unresolved (human)',          color: C.unresolved },
+  { id: 11, name: 'Abandoned (human)',           color: C.abandoned },
+  { id: 12, name: 'Unknown (human)',             color: C.unknown },
+];
+
+const sankeyLinks = [
+  // Inbound split
+  { source: 0, target: 1, value: DATA.contained.total },
+  { source: 0, target: 2, value: T.total },
+  // Contained → bot outcomes
+  { source: 1, target: 3, value: DATA.contained.resolved },
+  { source: 1, target: 4, value: DATA.contained.abandoned },
+  { source: 1, target: 5, value: DATA.contained.unknown },
+  // Transferred → transfer types
+  { source: 2, target: 6, value: T.byType.fullBotExp },
+  { source: 2, target: 7, value: T.byType.customerRequested },
+  { source: 2, target: 8, value: T.byType.botDecided },
+  // Full Bot Exp → human outcomes
+  { source: 6, target: 9,  value: split(T.outcomes.resolved,   typeWeights.full) },
+  { source: 6, target: 10, value: split(T.outcomes.unresolved, typeWeights.full) },
+  { source: 6, target: 11, value: split(T.outcomes.abandoned,  typeWeights.full) },
+  { source: 6, target: 12, value: split(T.outcomes.unknown,    typeWeights.full) },
+  // Customer Requested → human outcomes
+  { source: 7, target: 9,  value: split(T.outcomes.resolved,   typeWeights.cust) },
+  { source: 7, target: 10, value: split(T.outcomes.unresolved, typeWeights.cust) },
+  { source: 7, target: 11, value: split(T.outcomes.abandoned,  typeWeights.cust) },
+  { source: 7, target: 12, value: split(T.outcomes.unknown,    typeWeights.cust) },
+  // Bot Self-Escalated → human outcomes
+  { source: 8, target: 9,  value: split(T.outcomes.resolved,   typeWeights.bot) },
+  { source: 8, target: 10, value: split(T.outcomes.unresolved, typeWeights.bot) },
+  { source: 8, target: 11, value: split(T.outcomes.abandoned,  typeWeights.bot) },
+  { source: 8, target: 12, value: split(T.outcomes.unknown,    typeWeights.bot) },
+];
+
+// ── 7. RENDER SANKEY ──────────────────────────────────────────────────────
+const margin = { top: 24, right: 200, bottom: 16, left: 10 };
+const totalW  = Math.max(900, window.innerWidth - 120);
+const W = totalW - margin.left - margin.right;
+const H = 560 - margin.top  - margin.bottom;
+
+const svg = d3.select('#sankey')
+  .attr('width',  totalW)
+  .attr('height', H + margin.top + margin.bottom)
+  .append('g')
+  .attr('transform', `translate(${margin.left},${margin.top})`);
+
+const sankey = d3.sankey()
+  .nodeId(d => d.id)
+  .nodeWidth(18)
+  .nodePadding(14)
+  .extent([[0, 0], [W, H]])
+  .nodeSort(null);
+
+const graph = sankey({
+  nodes: sankeyNodes.map(d => ({ ...d })),
+  links: sankeyLinks.map(d => ({ ...d })),
+});
+
+// Tooltip
+const tip = document.getElementById('tooltip');
+function showTip(event, html) {
+  tip.innerHTML = html;
+  tip.style.opacity = '1';
+  tip.style.left = (event.clientX + 14) + 'px';
+  tip.style.top  = (event.clientY - 14) + 'px';
+}
+function hideTip() { tip.style.opacity = '0'; }
+
+// ── Links
+svg.append('g')
+  .selectAll('path')
+  .data(graph.links)
+  .join('path')
+    .attr('class', 'link')
+    .attr('d', d3.sankeyLinkHorizontal())
+    .attr('stroke',       d => d.source.color)
+    .attr('stroke-width', d => Math.max(1, d.width))
+    .attr('opacity', 0.28)
+    .on('mousemove', (event, d) => showTip(event, `
+      <div class="tip-title">${d.source.name} → ${d.target.name}</div>
+      <div class="tip-count">${fmt(d.value)} calls</div>
+      <div class="tip-pct">${pct(d.value, DATA.total)} of total inbound</div>
+      <div class="tip-of">${pct(d.value, d.source.value)} of "${d.source.name}"</div>
+    `))
+    .on('mouseleave', hideTip);
+
+// ── Nodes
+const node = svg.append('g')
+  .selectAll('g')
+  .data(graph.nodes)
+  .join('g')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+node.append('rect')
+  .attr('class', 'node-rect')
+  .attr('width',  d => d.x1 - d.x0)
+  .attr('height', d => Math.max(1, d.y1 - d.y0))
+  .attr('fill',   d => d.color)
+  .attr('rx', 4)
+  .on('mousemove', (event, d) => showTip(event, `
+    <div class="tip-title">${d.name}</div>
+    <div class="tip-count">${fmt(d.value)} calls</div>
+    <div class="tip-pct">${pct(d.value, DATA.total)} of total inbound</div>
+  `))
+  .on('mouseleave', hideTip);
+
+// ── Node labels (right-side anchor for most; left-side for last column)
+const isRightCol = d => d.x0 > W * 0.72;
+
+node.append('text')
+  .attr('x', d => isRightCol(d) ? -(d.x1 - d.x0) - 8 : (d.x1 - d.x0) + 8)
+  .attr('y', d => (d.y1 - d.y0) / 2 - 7)
+  .attr('dy', '0.35em')
+  .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
+  .attr('fill', '#1e293b')
+  .attr('font-size', '12px')
+  .attr('font-weight', '700')
+  .text(d => d.name);
+
+node.append('text')
+  .attr('x', d => isRightCol(d) ? -(d.x1 - d.x0) - 8 : (d.x1 - d.x0) + 8)
+  .attr('y', d => (d.y1 - d.y0) / 2 + 10)
+  .attr('dy', '0.35em')
+  .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
+  .attr('fill', '#64748b')
+  .attr('font-size', '11px')
+  .text(d => `${fmt(d.value)} · ${pct(d.value, DATA.total)}`);
+
+// ── 8. LEGEND ─────────────────────────────────────────────────────────────
+const LEGEND_GROUPS = [
+  {
+    heading: 'Bot Experience',
+    items: [
+      { color: C.inbound,   label: 'Inbound Calls' },
+      { color: C.contained, label: 'Contained by Bot (no escalation)' },
+      { color: C.transferred, label: 'Transferred to Human Agent' },
+    ],
+  },
+  {
+    heading: 'Transfer Type',
+    items: [
+      { color: C.fullBot,    label: 'Full Bot Experience then transfer' },
+      { color: C.custReq,    label: 'Customer Requested an Agent' },
+      { color: C.botDecided, label: 'Bot Self-Escalated (no answer)' },
+    ],
+  },
+  {
+    heading: 'Outcomes',
+    items: [
+      { color: C.resolved,   label: 'Resolved' },
+      { color: C.unresolved, label: 'Unresolved' },
+      { color: C.abandoned,  label: 'Abandoned / Hung up' },
+      { color: C.unknown,    label: 'Unknown' },
+    ],
+  },
+];
+
+const legendEl = document.getElementById('legend');
+LEGEND_GROUPS.forEach(g => {
+  legendEl.insertAdjacentHTML('beforeend',
+    `<span class="legend-group-label">${g.heading}</span>`);
+  g.items.forEach(item => {
+    legendEl.insertAdjacentHTML('beforeend', `
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:${item.color}"></div>
+        ${item.label}
+      </div>`);
+  });
+});
+</script>
+</body>
+</html>
