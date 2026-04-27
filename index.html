@@ -757,7 +757,7 @@ function csatSubSplit(human) {
       <div class="cx-sub-item">
         <span class="sub-label">
           <span class="cx-sub-dot" style="background:${C.fullBot}"></span>
-          Full Bot Experience
+          Customer Requested Agent
         </span>
         <span class="sub-val" style="color:${csatColor(human.fullBot.score)}">
           ${human.fullBot.score.toFixed(1)}
@@ -767,7 +767,7 @@ function csatSubSplit(human) {
       <div class="cx-sub-item">
         <span class="sub-label">
           <span class="cx-sub-dot" style="background:${C.unresolved}"></span>
-          Interrupted (cust. req. or bot)
+          Bot Self-Escalated (no answer)
         </span>
         <span class="sub-val" style="color:${csatColor(human.interrupted.score)}">
           ${human.interrupted.score.toFixed(1)}
@@ -782,7 +782,7 @@ function ahtSubSplit(human) {
       <div class="cx-sub-item">
         <span class="sub-label">
           <span class="cx-sub-dot" style="background:${C.fullBot}"></span>
-          Full Bot Experience
+          Customer Requested Agent
         </span>
         <span class="sub-val" style="color:#475569">
           ${fmtTime(human.fullBot.seconds)}
@@ -792,7 +792,7 @@ function ahtSubSplit(human) {
       <div class="cx-sub-item">
         <span class="sub-label">
           <span class="cx-sub-dot" style="background:${C.unresolved}"></span>
-          Interrupted (cust. req. or bot)
+          Bot Self-Escalated (no answer)
         </span>
         <span class="sub-val" style="color:#475569">
           ${fmtTime(human.interrupted.seconds)}
