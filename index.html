@@ -63,6 +63,26 @@
       outline: none;
     }
     .header-controls select option { background: #1e3a8a; }
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      opacity: 0.7;
+    }
+    .purpose-select {
+      background: rgba(255,255,255,0.95) !important;
+      color: #1e293b !important;
+      font-weight: 700 !important;
+      border-color: rgba(255,255,255,0.8) !important;
+      padding-left: 10px !important;
+    }
+    .purpose-select option { background: white; color: #1e293b; }
+    .filter-divider {
+      width: 1px; height: 28px;
+      background: rgba(255,255,255,0.25);
+      margin: 0 4px;
+    }
 
     /* ── Stats Row ───────────────────────────────────────────── */
     .stats-row {
@@ -456,6 +476,15 @@
     <p>Contact Center · AI Bot Experience · Call Flow Breakdown</p>
   </div>
   <div class="header-controls">
+    <span class="filter-label">Call Purpose</span>
+    <select id="purposeSelect" class="purpose-select">
+      <option value="all">All Purposes</option>
+      <option value="sms">SMS Registration</option>
+      <option value="cancel">Account Cancellation</option>
+      <option value="password">Password Reset</option>
+      <option value="other">Other Purposes</option>
+    </select>
+    <div class="filter-divider"></div>
     <select id="rangeSelect">
       <option>Last 7 days</option>
       <option selected>Last 30 days</option>
@@ -523,30 +552,76 @@
 
 <!-- ═══════════════════════════════ SCRIPT ═══════════════════════════════ -->
 <script>
-// ── 1. DATA MODEL ─────────────────────────────────────────────────────────
-// Swap these numbers for real data at any time.
-const DATA = {
-  total: 10000,
-  contained: {
-    total:     6000,
-    resolved:  3600,
-    abandoned: 1800,
-    unknown:    600,
-  },
-  transferred: {
-    total: 4000,
-    // How the transfer was initiated
-    byType: {
-      fullBotExp:          1600,  // bot fully qualified, then handed off
-      customerRequested:   1200,  // customer pressed "talk to agent"
-      botDecided:          1200,  // bot didn't have an answer, self-escalated
+// ── 1. PER-PURPOSE DATA ───────────────────────────────────────────────────
+const PURPOSES = {
+  all: {
+    label: 'All Purposes',
+    total: 10000,
+    contained: { total: 6000, resolved: 3600, abandoned: 1800, unknown: 600 },
+    transferred: {
+      total: 4000,
+      byType: { fullBotExp: 1600, customerRequested: 1200, botDecided: 1200 },
+      outcomes: { resolved: 2000, unresolved: 800, abandoned: 800, unknown: 400 },
     },
-    // What happened once with the human agent
-    outcomes: {
-      resolved:   2000,
-      unresolved:  800,
-      abandoned:   800,
-      unknown:     400,
+    cx: {
+      csat: { bot: { score: 3.8 }, human: { score: 4.3, fullBot: { score: 4.5 }, interrupted: { score: 3.9 } } },
+      aht:  { bot: { seconds: 165 }, human: { seconds: 500, fullBot: { seconds: 555 }, interrupted: { seconds: 400 } } },
+    },
+  },
+  sms: {
+    label: 'SMS Registration',
+    total: 2500,
+    contained: { total: 2000, resolved: 1600, abandoned: 280, unknown: 120 },
+    transferred: {
+      total: 500,
+      byType: { fullBotExp: 260, customerRequested: 140, botDecided: 100 },
+      outcomes: { resolved: 310, unresolved: 70, abandoned: 80, unknown: 40 },
+    },
+    cx: {
+      csat: { bot: { score: 4.2 }, human: { score: 4.4, fullBot: { score: 4.6 }, interrupted: { score: 4.0 } } },
+      aht:  { bot: { seconds: 110 }, human: { seconds: 420, fullBot: { seconds: 480 }, interrupted: { seconds: 330 } } },
+    },
+  },
+  cancel: {
+    label: 'Account Cancellation',
+    total: 1500,
+    contained: { total: 600, resolved: 280, abandoned: 210, unknown: 110 },
+    transferred: {
+      total: 900,
+      byType: { fullBotExp: 200, customerRequested: 460, botDecided: 240 },
+      outcomes: { resolved: 390, unresolved: 260, abandoned: 160, unknown: 90 },
+    },
+    cx: {
+      csat: { bot: { score: 3.2 }, human: { score: 4.1, fullBot: { score: 4.3 }, interrupted: { score: 3.7 } } },
+      aht:  { bot: { seconds: 215 }, human: { seconds: 680, fullBot: { seconds: 730 }, interrupted: { seconds: 580 } } },
+    },
+  },
+  password: {
+    label: 'Password Reset',
+    total: 3000,
+    contained: { total: 2700, resolved: 2430, abandoned: 180, unknown: 90 },
+    transferred: {
+      total: 300,
+      byType: { fullBotExp: 180, customerRequested: 70, botDecided: 50 },
+      outcomes: { resolved: 215, unresolved: 38, abandoned: 28, unknown: 19 },
+    },
+    cx: {
+      csat: { bot: { score: 4.5 }, human: { score: 4.6, fullBot: { score: 4.7 }, interrupted: { score: 4.3 } } },
+      aht:  { bot: { seconds: 85 }, human: { seconds: 370, fullBot: { seconds: 415 }, interrupted: { seconds: 295 } } },
+    },
+  },
+  other: {
+    label: 'Other Purposes',
+    total: 3000,
+    contained: { total: 700, resolved: 290, abandoned: 260, unknown: 150 },
+    transferred: {
+      total: 2300,
+      byType: { fullBotExp: 960, customerRequested: 530, botDecided: 810 },
+      outcomes: { resolved: 1085, unresolved: 460, abandoned: 532, unknown: 223 },
+    },
+    cx: {
+      csat: { bot: { score: 3.5 }, human: { score: 4.2, fullBot: { score: 4.3 }, interrupted: { score: 3.8 } } },
+      aht:  { bot: { seconds: 198 }, human: { seconds: 545, fullBot: { seconds: 595 }, interrupted: { seconds: 462 } } },
     },
   },
 };
@@ -565,385 +640,101 @@ const C = {
   unknown:      '#94a3b8',
 };
 
-// ── 3. DERIVED HELPERS ─────────────────────────────────────────────────────
-function pct(val, of) { return (val / of * 100).toFixed(1) + '%'; }
+// ── 3. HELPERS ────────────────────────────────────────────────────────────
+function pct(val, of)  { return (val / of * 100).toFixed(1) + '%'; }
 function fmt(n)        { return n.toLocaleString(); }
-
-const T = DATA.transferred;
-const typeWeights = {
-  full: T.byType.fullBotExp        / T.total,
-  cust: T.byType.customerRequested / T.total,
-  bot:  T.byType.botDecided        / T.total,
-};
-
-// Distribute human outcomes across the three transfer-type nodes proportionally
-function split(outcomeVal, weight) { return Math.round(outcomeVal * weight); }
-
-// ── 4. SUMMARY STATS ──────────────────────────────────────────────────────
-const STATS = [
-  {
-    label: 'Total Inbound Calls',
-    value: fmt(DATA.total),
-    sub:   '100% of traffic',
-    color: C.inbound,
-    bg:    '#eff6ff',
-  },
-  {
-    label: 'Bot Contained',
-    value: fmt(DATA.contained.total),
-    sub:   pct(DATA.contained.total, DATA.total) + ' of inbound',
-    color: C.contained,
-    bg:    '#f5f3ff',
-  },
-  {
-    label: 'Escalated to Human',
-    value: fmt(T.total),
-    sub:   pct(T.total, DATA.total) + ' of inbound',
-    color: C.transferred,
-    bg:    '#fffbeb',
-  },
-  {
-    label: 'Resolved by Bot',
-    value: pct(DATA.contained.resolved, DATA.total),
-    sub:   fmt(DATA.contained.resolved) + ' calls — autonomous resolution',
-    color: C.contained,
-    bg:    '#f5f3ff',
-    badge: 'BOT',
-    badgeColor: C.contained,
-  },
-  {
-    label: 'Resolved by Human',
-    value: pct(T.outcomes.resolved, DATA.total),
-    sub:   fmt(T.outcomes.resolved) + ' calls — after escalation',
-    color: C.resolved,
-    bg:    '#f0fdf4',
-    badge: 'HUMAN',
-    badgeColor: C.resolved,
-  },
-];
-
-const statsRow = document.getElementById('statsRow');
-STATS.forEach(s => {
-  const badgeHtml = s.badge
-    ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:0.06em;background:${s.badgeColor};color:white;vertical-align:middle">${s.badge}</span>`
-    : '';
-  statsRow.insertAdjacentHTML('beforeend', `
-    <div class="stat-card" style="background:${s.bg};border-color:${s.color}33;color:${s.color}">
-      <div class="label">${s.label}</div>
-      <div class="value">${s.value}${badgeHtml}</div>
-      <div class="sub">${s.sub}</div>
-    </div>`);
-});
-
-// ── 4b. TRANSFER BREAKDOWN ROW ────────────────────────────────────────────
-const interrupted = T.byType.customerRequested + T.byType.botDecided;
-const fullBotTransfer = T.byType.fullBotExp;
-
-const BREAKDOWN_CARDS = [
-  {
-    icon: '🤖',
-    iconBg: '#fef3c7',
-    label: 'Full Bot Experience → Human',
-    value: fmt(fullBotTransfer),
-    valueSub: pct(fullBotTransfer, T.total) + ' of escalated · ' + pct(fullBotTransfer, DATA.total) + ' of inbound',
-    color: C.fullBot,
-    bg: '#fffbeb',
-    tooltip: 'Customer went through the complete bot experience before being transferred',
-  },
-  {
-    icon: '⚡',
-    iconBg: '#fee2e2',
-    label: 'Interrupted Bot Experience',
-    value: fmt(interrupted),
-    valueSub: pct(interrupted, T.total) + ' of escalated · ' + pct(interrupted, DATA.total) + ' of inbound',
-    color: C.unresolved,
-    bg: '#fff1f2',
-    tooltip: `Customer Requested (${fmt(T.byType.customerRequested)}) + Bot Self-Escalated (${fmt(T.byType.botDecided)})`,
-    breakdown: [
-      { label: 'Customer requested agent', value: fmt(T.byType.customerRequested), pct: pct(T.byType.customerRequested, interrupted) },
-      { label: 'Bot self-escalated (no answer)', value: fmt(T.byType.botDecided), pct: pct(T.byType.botDecided, interrupted) },
-    ],
-  },
-];
-
-const breakdownEl = document.getElementById('breakdownCards');
-BREAKDOWN_CARDS.forEach((card, i) => {
-  if (i === 1) {
-    breakdownEl.insertAdjacentHTML('beforeend', `<div class="bc-divider">vs</div>`);
-  }
-  const breakdownHtml = card.breakdown
-    ? card.breakdown.map(b => `
-        <span style="display:inline-flex;align-items:center;gap:5px;margin-right:10px;font-size:10px;color:#64748b;font-weight:600">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${card.color};opacity:0.7"></span>
-          ${b.label}: <strong>${b.value}</strong> (${b.pct})
-        </span>`).join('')
-    : '';
-  breakdownEl.insertAdjacentHTML('beforeend', `
-    <div class="bc-card" style="background:${card.bg};border-color:${card.color}44;color:${card.color}" title="${card.tooltip}">
-      <div class="bc-icon" style="background:${card.iconBg}">${card.icon}</div>
-      <div class="bc-body">
-        <div class="bc-label">${card.label}</div>
-        <div class="bc-value">${card.value}</div>
-        <div class="bc-sub">${card.valueSub}</div>
-        ${breakdownHtml ? `<div style="margin-top:5px">${breakdownHtml}</div>` : ''}
-      </div>
-    </div>`);
-});
-
-// ── 4c. CX METRICS (CSAT + AHT) ──────────────────────────────────────────
-// Swap these sample values for live data at any time.
-const CX = {
-  csat: {
-    bot: { score: 3.8 },
-    human: {
-      score: 4.3,
-      fullBot:     { score: 4.5 },
-      interrupted: { score: 3.9 },
-    },
-  },
-  aht: {
-    bot: { seconds: 165 },   // 2m 45s — full AI self-service interaction
-    human: {
-      seconds: 500,           // 8m 20s — overall average
-      fullBot:     { seconds: 555 },  // 9m 15s — longer; bot context to re-explain
-      interrupted: { seconds: 400 },  // 6m 40s — shorter; less context to re-cover
-    },
-  },
-};
+function split(v, w)   { return Math.round(v * w); }
 
 function fmtTime(s) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
+  const m = Math.floor(s / 60), sec = s % 60;
   return sec === 0 ? `${m}m` : `${m}m ${sec}s`;
 }
-
 function csatColor(score) {
   if (score >= 4.5) return '#059669';
   if (score >= 4.0) return '#2563eb';
   if (score >= 3.5) return '#d97706';
   return '#dc2626';
 }
-
 function starsHtml(score) {
   return Array.from({ length: 5 }, (_, i) => {
-    const filled = score >= i + 1;
-    const half   = !filled && score >= i + 0.5;
-    return `<span class="star" style="color:${filled || half ? '#f59e0b' : '#e2e8f0'}">${filled ? '★' : half ? '⯨' : '★'}</span>`;
+    const filled = score >= i + 1, half = !filled && score >= i + 0.5;
+    return `<span class="star" style="color:${filled||half?'#f59e0b':'#e2e8f0'}">${filled?'★':half?'⯨':'★'}</span>`;
   }).join('');
 }
-
 function deltaBadge(a, b) {
-  // a = current metric, b = reference; show how a differs from b
-  const diffCsat = (a - b).toFixed(1);
-  const isPos = a >= b;
-  const bg  = isPos ? '#dcfce7' : '#fee2e2';
-  const col = isPos ? '#15803d' : '#b91c1c';
-  const sign = isPos ? '+' : '';
-  return `<span class="delta-badge" style="background:${bg};color:${col}">${sign}${diffCsat}</span>`;
+  const d = (a - b).toFixed(1), pos = a >= b;
+  return `<span class="delta-badge" style="background:${pos?'#dcfce7':'#fee2e2'};color:${pos?'#15803d':'#b91c1c'}">${pos?'+':''}${d}</span>`;
 }
-
 function deltaTimeBadge(a, b) {
-  const diff = a - b;
-  const isPos = diff > 0;
-  const bg  = isPos ? '#fee2e2' : '#dcfce7'; // longer = worse for AHT
-  const col = isPos ? '#b91c1c' : '#15803d';
-  const sign = diff > 0 ? '+' : '';
-  return `<span class="delta-badge" style="background:${bg};color:${col}">${sign}${fmtTime(Math.abs(diff))} ${diff > 0 ? '▲' : '▼'}</span>`;
+  const diff = a - b, pos = diff > 0;
+  return `<span class="delta-badge" style="background:${pos?'#fee2e2':'#dcfce7'};color:${pos?'#b91c1c':'#15803d'}">${pos?'+':''}${fmtTime(Math.abs(diff))} ${pos?'▲':'▼'}</span>`;
 }
 
-function csatSubSplit(human) {
-  return `
-    <div class="cx-sub-split">
-      <div class="cx-sub-item">
-        <span class="sub-label">
-          <span class="cx-sub-dot" style="background:${C.fullBot}"></span>
-          Full Bot Experience
-        </span>
-        <span class="sub-val" style="color:${csatColor(human.fullBot.score)}">
-          ${human.fullBot.score.toFixed(1)}
-          ${deltaBadge(human.fullBot.score, human.interrupted.score)}
-        </span>
-      </div>
-      <div class="cx-sub-item">
-        <span class="sub-label">
-          <span class="cx-sub-dot" style="background:${C.unresolved}"></span>
-          Interrupted Bot Experience
-        </span>
-        <span class="sub-val" style="color:${csatColor(human.interrupted.score)}">
-          ${human.interrupted.score.toFixed(1)}
-        </span>
-      </div>
-    </div>`;
-}
+// ── 4. STATIC ONE-TIME SETUP ──────────────────────────────────────────────
 
-function ahtSubSplit(human) {
-  return `
-    <div class="cx-sub-split">
-      <div class="cx-sub-item">
-        <span class="sub-label">
-          <span class="cx-sub-dot" style="background:${C.fullBot}"></span>
-          Full Bot Experience
-        </span>
-        <span class="sub-val" style="color:#475569">
-          ${fmtTime(human.fullBot.seconds)}
-          ${deltaTimeBadge(human.fullBot.seconds, human.interrupted.seconds)}
-        </span>
-      </div>
-      <div class="cx-sub-item">
-        <span class="sub-label">
-          <span class="cx-sub-dot" style="background:${C.unresolved}"></span>
-          Interrupted Bot Experience
-        </span>
-        <span class="sub-val" style="color:#475569">
-          ${fmtTime(human.interrupted.seconds)}
-        </span>
-      </div>
-    </div>`;
-}
-
-// Render CSAT cards
-const csatCards = document.getElementById('csatCards');
-csatCards.insertAdjacentHTML('beforeend', `
-  <div class="cx-card" style="background:#f5f3ff;border-color:${C.contained}33;color:${C.contained}">
-    <div class="cx-card-label">Bot Contained</div>
-    <div class="cx-card-value">${CX.csat.bot.score.toFixed(1)}<span class="cx-card-unit">/ 5</span></div>
-    <div class="csat-stars">${starsHtml(CX.csat.bot.score)}</div>
-    <div class="cx-card-sub">${fmt(DATA.contained.total)} conversations</div>
-  </div>`);
-
-csatCards.insertAdjacentHTML('beforeend', `<div class="cx-vs">vs</div>`);
-
-csatCards.insertAdjacentHTML('beforeend', `
-  <div class="cx-card" style="background:#fffbeb;border-color:${C.transferred}33;color:${C.transferred}">
-    <div class="cx-card-label">Transferred to Human ${deltaBadge(CX.csat.human.score, CX.csat.bot.score)}</div>
-    <div class="cx-card-value">${CX.csat.human.score.toFixed(1)}<span class="cx-card-unit">/ 5</span></div>
-    <div class="csat-stars">${starsHtml(CX.csat.human.score)}</div>
-    <div class="cx-card-sub">${fmt(T.total)} conversations</div>
-    ${csatSubSplit(CX.csat.human)}
-  </div>`);
-
-// Render AHT cards
-const ahtCards = document.getElementById('ahtCards');
-ahtCards.insertAdjacentHTML('beforeend', `
-  <div class="cx-card" style="background:#f5f3ff;border-color:${C.contained}33;color:${C.contained}">
-    <div class="cx-card-label">AI Bot Experience</div>
-    <div class="cx-card-value">${fmtTime(CX.aht.bot.seconds)}</div>
-    <div class="cx-card-sub">avg. per conversation</div>
-  </div>`);
-
-ahtCards.insertAdjacentHTML('beforeend', `<div class="cx-vs">vs</div>`);
-
-ahtCards.insertAdjacentHTML('beforeend', `
-  <div class="cx-card" style="background:#fffbeb;border-color:${C.transferred}33;color:${C.transferred}">
-    <div class="cx-card-label">Human Agent ${deltaTimeBadge(CX.aht.human.seconds, CX.aht.bot.seconds)}</div>
-    <div class="cx-card-value">${fmtTime(CX.aht.human.seconds)}</div>
-    <div class="cx-card-sub">avg. per conversation</div>
-    ${ahtSubSplit(CX.aht.human)}
-  </div>`);
-
-// ── 5. COLUMN HEADERS ─────────────────────────────────────────────────────
+// Column headers (static)
 const COL_DEFS = [
-  { label: 'Inbound',          color: C.inbound },
-  { label: 'Bot Routing',      color: C.contained },
-  { label: 'Transfer Type / Bot Outcome', color: C.transferred },
-  { label: 'Human Outcome',    color: C.resolved },
+  { label: 'Inbound',                        color: C.inbound },
+  { label: 'Bot Routing',                    color: C.contained },
+  { label: 'Transfer Type / Bot Outcome',    color: C.transferred },
+  { label: 'Human Outcome',                  color: C.resolved },
 ];
-
 const colHeaders = document.getElementById('colHeaders');
 COL_DEFS.forEach(h => {
   colHeaders.insertAdjacentHTML('beforeend', `
     <div class="col-header" style="color:${h.color};background:${h.color}11">
-      <span class="dot" style="background:${h.color}"></span>
-      ${h.label}
+      <span class="dot" style="background:${h.color}"></span>${h.label}
     </div>`);
 });
 
-// ── 6. SANKEY GRAPH DEFINITION ────────────────────────────────────────────
-//  Node IDs
-//  0  Inbound
-//  1  Contained
-//  2  Transferred
-//  3  Bot-Resolved       (contained outcome)
-//  4  Bot-Abandoned      (contained outcome)
-//  5  Bot-Unknown        (contained outcome)
-//  6  Full Bot Exp       (transfer type)
-//  7  Customer Requested (transfer type)
-//  8  Bot Decided        (transfer type)
-//  9  Human Resolved     (human outcome)
-// 10  Human Unresolved   (human outcome)
-// 11  Human Abandoned    (human outcome)
-// 12  Human Unknown      (human outcome)
-
-const sankeyNodes = [
-  { id: 0,  name: 'Inbound Calls',              color: C.inbound },
-  { id: 1,  name: 'Contained by Bot',           color: C.contained },
-  { id: 2,  name: 'Transferred to Human',       color: C.transferred },
-  { id: 3,  name: 'Resolved (bot)',              color: C.resolved },
-  { id: 4,  name: 'Abandoned (bot)',             color: C.abandoned },
-  { id: 5,  name: 'Unknown (bot)',               color: C.unknown },
-  { id: 6,  name: 'Full Bot Experience',         color: C.fullBot },
-  { id: 7,  name: 'Customer Requested Agent',    color: C.custReq },
-  { id: 8,  name: 'Bot Self-Escalated',          color: C.botDecided },
-  { id: 9,  name: 'Resolved (human)',            color: C.resolved },
-  { id: 10, name: 'Unresolved (human)',          color: C.unresolved },
-  { id: 11, name: 'Abandoned (human)',           color: C.abandoned },
-  { id: 12, name: 'Unknown (human)',             color: C.unknown },
+// Legend (static)
+const LEGEND_GROUPS = [
+  { heading: 'Bot Experience', items: [
+    { color: C.inbound,     label: 'Inbound Calls' },
+    { color: C.contained,   label: 'Contained by Bot (no escalation)' },
+    { color: C.transferred, label: 'Transferred to Human Agent' },
+  ]},
+  { heading: 'Transfer Type', items: [
+    { color: C.fullBot,    label: 'Full Bot Experience then transfer' },
+    { color: C.custReq,    label: 'Customer Requested an Agent' },
+    { color: C.botDecided, label: 'Bot Self-Escalated (no answer)' },
+  ]},
+  { heading: 'Outcomes', items: [
+    { color: C.resolved,   label: 'Resolved' },
+    { color: C.unresolved, label: 'Unresolved' },
+    { color: C.abandoned,  label: 'Abandoned / Hung up' },
+    { color: C.unknown,    label: 'Unknown' },
+  ]},
 ];
+const legendEl = document.getElementById('legend');
+LEGEND_GROUPS.forEach(g => {
+  legendEl.insertAdjacentHTML('beforeend', `<span class="legend-group-label">${g.heading}</span>`);
+  g.items.forEach(item => {
+    legendEl.insertAdjacentHTML('beforeend', `
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:${item.color}"></div>${item.label}
+      </div>`);
+  });
+});
 
-const sankeyLinks = [
-  // Inbound split
-  { source: 0, target: 1, value: DATA.contained.total },
-  { source: 0, target: 2, value: T.total },
-  // Contained → bot outcomes
-  { source: 1, target: 3, value: DATA.contained.resolved },
-  { source: 1, target: 4, value: DATA.contained.abandoned },
-  { source: 1, target: 5, value: DATA.contained.unknown },
-  // Transferred → transfer types
-  { source: 2, target: 6, value: T.byType.fullBotExp },
-  { source: 2, target: 7, value: T.byType.customerRequested },
-  { source: 2, target: 8, value: T.byType.botDecided },
-  // Full Bot Exp → human outcomes
-  { source: 6, target: 9,  value: split(T.outcomes.resolved,   typeWeights.full) },
-  { source: 6, target: 10, value: split(T.outcomes.unresolved, typeWeights.full) },
-  { source: 6, target: 11, value: split(T.outcomes.abandoned,  typeWeights.full) },
-  { source: 6, target: 12, value: split(T.outcomes.unknown,    typeWeights.full) },
-  // Customer Requested → human outcomes
-  { source: 7, target: 9,  value: split(T.outcomes.resolved,   typeWeights.cust) },
-  { source: 7, target: 10, value: split(T.outcomes.unresolved, typeWeights.cust) },
-  { source: 7, target: 11, value: split(T.outcomes.abandoned,  typeWeights.cust) },
-  { source: 7, target: 12, value: split(T.outcomes.unknown,    typeWeights.cust) },
-  // Bot Self-Escalated → human outcomes
-  { source: 8, target: 9,  value: split(T.outcomes.resolved,   typeWeights.bot) },
-  { source: 8, target: 10, value: split(T.outcomes.unresolved, typeWeights.bot) },
-  { source: 8, target: 11, value: split(T.outcomes.abandoned,  typeWeights.bot) },
-  { source: 8, target: 12, value: split(T.outcomes.unknown,    typeWeights.bot) },
-];
-
-// ── 7. RENDER SANKEY ──────────────────────────────────────────────────────
+// Sankey SVG setup (static frame, content redrawn on filter change)
 const margin = { top: 24, right: 200, bottom: 16, left: 10 };
 const totalW  = Math.max(900, window.innerWidth - 120);
 const W = totalW - margin.left - margin.right;
-const H = 560 - margin.top  - margin.bottom;
+const H = 560 - margin.top - margin.bottom;
 
-const svg = d3.select('#sankey')
+const svgRoot = d3.select('#sankey')
   .attr('width',  totalW)
-  .attr('height', H + margin.top + margin.bottom)
-  .append('g')
-  .attr('transform', `translate(${margin.left},${margin.top})`);
+  .attr('height', H + margin.top + margin.bottom);
+let svgG = svgRoot.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-const sankey = d3.sankey()
+const sankeyLayout = d3.sankey()
   .nodeId(d => d.id)
   .nodeWidth(18)
   .nodePadding(14)
   .extent([[0, 0], [W, H]])
   .nodeSort(null);
 
-const graph = sankey({
-  nodes: sankeyNodes.map(d => ({ ...d })),
-  links: sankeyLinks.map(d => ({ ...d })),
-});
-
-// Tooltip
 const tip = document.getElementById('tooltip');
 function showTip(event, html) {
   tip.innerHTML = html;
@@ -953,11 +744,171 @@ function showTip(event, html) {
 }
 function hideTip() { tip.style.opacity = '0'; }
 
-// ── Links
-svg.append('g')
-  .selectAll('path')
-  .data(graph.links)
-  .join('path')
+// ── 5. RENDER FUNCTION ────────────────────────────────────────────────────
+function render(purposeKey) {
+  const D  = PURPOSES[purposeKey];
+  const T  = D.transferred;
+  const CX = D.cx;
+  const tw = {
+    full: T.byType.fullBotExp        / T.total,
+    cust: T.byType.customerRequested / T.total,
+    bot:  T.byType.botDecided        / T.total,
+  };
+
+  // ── Stats row
+  const statsRow = document.getElementById('statsRow');
+  statsRow.innerHTML = '';
+  [
+    { label: 'Total Inbound Calls', value: fmt(D.total),                          sub: '100% of traffic',                                         color: C.inbound,     bg: '#eff6ff' },
+    { label: 'Bot Contained',       value: fmt(D.contained.total),                sub: pct(D.contained.total, D.total) + ' of inbound',            color: C.contained,   bg: '#f5f3ff' },
+    { label: 'Escalated to Human',  value: fmt(T.total),                          sub: pct(T.total, D.total) + ' of inbound',                      color: C.transferred, bg: '#fffbeb' },
+    { label: 'Resolved by Bot',     value: pct(D.contained.resolved, D.total),    sub: fmt(D.contained.resolved) + ' calls — autonomous',           color: C.contained,   bg: '#f5f3ff', badge: 'BOT',   badgeColor: C.contained },
+    { label: 'Resolved by Human',   value: pct(T.outcomes.resolved, D.total),     sub: fmt(T.outcomes.resolved)   + ' calls — after escalation',    color: C.resolved,    bg: '#f0fdf4', badge: 'HUMAN', badgeColor: C.resolved  },
+  ].forEach(s => {
+    const b = s.badge ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;background:${s.badgeColor};color:white;vertical-align:middle">${s.badge}</span>` : '';
+    statsRow.insertAdjacentHTML('beforeend', `
+      <div class="stat-card" style="background:${s.bg};border-color:${s.color}33;color:${s.color}">
+        <div class="label">${s.label}</div>
+        <div class="value">${s.value}${b}</div>
+        <div class="sub">${s.sub}</div>
+      </div>`);
+  });
+
+  // ── Breakdown row
+  const breakdownEl = document.getElementById('breakdownCards');
+  breakdownEl.innerHTML = '';
+  const interrupted   = T.byType.customerRequested + T.byType.botDecided;
+  const fullBotXfer   = T.byType.fullBotExp;
+  [
+    {
+      icon: '🤖', iconBg: '#fef3c7', color: C.fullBot, bg: '#fffbeb',
+      label: 'Full Bot Experience → Human',
+      value: fmt(fullBotXfer),
+      valueSub: pct(fullBotXfer, T.total) + ' of escalated · ' + pct(fullBotXfer, D.total) + ' of inbound',
+      tooltip: 'Customer completed the full bot experience before transfer',
+    },
+    {
+      icon: '⚡', iconBg: '#fee2e2', color: C.unresolved, bg: '#fff1f2',
+      label: 'Interrupted Bot Experience',
+      value: fmt(interrupted),
+      valueSub: pct(interrupted, T.total) + ' of escalated · ' + pct(interrupted, D.total) + ' of inbound',
+      tooltip: `Customer Requested (${fmt(T.byType.customerRequested)}) + Bot Self-Escalated (${fmt(T.byType.botDecided)})`,
+      breakdown: [
+        { label: 'Customer requested agent',    value: fmt(T.byType.customerRequested), p: pct(T.byType.customerRequested, interrupted) },
+        { label: 'Bot self-escalated (no answer)', value: fmt(T.byType.botDecided),     p: pct(T.byType.botDecided, interrupted) },
+      ],
+    },
+  ].forEach((card, i) => {
+    if (i === 1) breakdownEl.insertAdjacentHTML('beforeend', `<div class="bc-divider">vs</div>`);
+    const bHtml = (card.breakdown || []).map(b => `
+      <span style="display:inline-flex;align-items:center;gap:5px;margin-right:10px;font-size:10px;color:#64748b;font-weight:600">
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${card.color};opacity:0.7"></span>
+        ${b.label}: <strong>${b.value}</strong> (${b.p})
+      </span>`).join('');
+    breakdownEl.insertAdjacentHTML('beforeend', `
+      <div class="bc-card" style="background:${card.bg};border-color:${card.color}44;color:${card.color}" title="${card.tooltip}">
+        <div class="bc-icon" style="background:${card.iconBg}">${card.icon}</div>
+        <div class="bc-body">
+          <div class="bc-label">${card.label}</div>
+          <div class="bc-value">${card.value}</div>
+          <div class="bc-sub">${card.valueSub}</div>
+          ${bHtml ? `<div style="margin-top:5px">${bHtml}</div>` : ''}
+        </div>
+      </div>`);
+  });
+
+  // ── CX metrics
+  const subSplit = (human, metricFn, colorFn, refScore) => `
+    <div class="cx-sub-split">
+      <div class="cx-sub-item">
+        <span class="sub-label"><span class="cx-sub-dot" style="background:${C.fullBot}"></span>Full Bot Experience</span>
+        <span class="sub-val" style="color:${colorFn(human.fullBot)}">${metricFn(human.fullBot)}${refScore !== undefined ? deltaBadge(human.fullBot.score, human.interrupted.score) : deltaTimeBadge(human.fullBot.seconds, human.interrupted.seconds)}</span>
+      </div>
+      <div class="cx-sub-item">
+        <span class="sub-label"><span class="cx-sub-dot" style="background:${C.unresolved}"></span>Interrupted Bot Experience</span>
+        <span class="sub-val" style="color:${colorFn(human.interrupted)}">${metricFn(human.interrupted)}</span>
+      </div>
+    </div>`;
+
+  document.getElementById('csatCards').innerHTML = `
+    <div class="cx-card" style="background:#f5f3ff;border-color:${C.contained}33;color:${C.contained}">
+      <div class="cx-card-label">Bot Contained</div>
+      <div class="cx-card-value">${CX.csat.bot.score.toFixed(1)}<span class="cx-card-unit">/ 5</span></div>
+      <div class="csat-stars">${starsHtml(CX.csat.bot.score)}</div>
+      <div class="cx-card-sub">${fmt(D.contained.total)} conversations</div>
+    </div>
+    <div class="cx-vs">vs</div>
+    <div class="cx-card" style="background:#fffbeb;border-color:${C.transferred}33;color:${C.transferred}">
+      <div class="cx-card-label">Transferred to Human ${deltaBadge(CX.csat.human.score, CX.csat.bot.score)}</div>
+      <div class="cx-card-value">${CX.csat.human.score.toFixed(1)}<span class="cx-card-unit">/ 5</span></div>
+      <div class="csat-stars">${starsHtml(CX.csat.human.score)}</div>
+      <div class="cx-card-sub">${fmt(T.total)} conversations</div>
+      ${subSplit(CX.csat.human, h => h.score.toFixed(1), h => csatColor(h.score), true)}
+    </div>`;
+
+  document.getElementById('ahtCards').innerHTML = `
+    <div class="cx-card" style="background:#f5f3ff;border-color:${C.contained}33;color:${C.contained}">
+      <div class="cx-card-label">AI Bot Experience</div>
+      <div class="cx-card-value">${fmtTime(CX.aht.bot.seconds)}</div>
+      <div class="cx-card-sub">avg. per conversation</div>
+    </div>
+    <div class="cx-vs">vs</div>
+    <div class="cx-card" style="background:#fffbeb;border-color:${C.transferred}33;color:${C.transferred}">
+      <div class="cx-card-label">Human Agent ${deltaTimeBadge(CX.aht.human.seconds, CX.aht.bot.seconds)}</div>
+      <div class="cx-card-value">${fmtTime(CX.aht.human.seconds)}</div>
+      <div class="cx-card-sub">avg. per conversation</div>
+      ${subSplit(CX.aht.human, h => fmtTime(h.seconds), () => '#475569', undefined)}
+    </div>`;
+
+  // ── Sankey
+  svgG.remove();
+  svgG = svgRoot.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const isRightCol = d => d.x0 > W * 0.72;
+  const sankeyNodes = [
+    { id: 0,  name: 'Inbound Calls',           color: C.inbound },
+    { id: 1,  name: 'Contained by Bot',        color: C.contained },
+    { id: 2,  name: 'Transferred to Human',    color: C.transferred },
+    { id: 3,  name: 'Resolved (bot)',           color: C.resolved },
+    { id: 4,  name: 'Abandoned (bot)',          color: C.abandoned },
+    { id: 5,  name: 'Unknown (bot)',            color: C.unknown },
+    { id: 6,  name: 'Full Bot Experience',      color: C.fullBot },
+    { id: 7,  name: 'Customer Requested Agent', color: C.custReq },
+    { id: 8,  name: 'Bot Self-Escalated',       color: C.botDecided },
+    { id: 9,  name: 'Resolved (human)',         color: C.resolved },
+    { id: 10, name: 'Unresolved (human)',       color: C.unresolved },
+    { id: 11, name: 'Abandoned (human)',        color: C.abandoned },
+    { id: 12, name: 'Unknown (human)',          color: C.unknown },
+  ];
+  const sankeyLinks = [
+    { source: 0, target: 1, value: D.contained.total },
+    { source: 0, target: 2, value: T.total },
+    { source: 1, target: 3, value: D.contained.resolved },
+    { source: 1, target: 4, value: D.contained.abandoned },
+    { source: 1, target: 5, value: D.contained.unknown },
+    { source: 2, target: 6, value: T.byType.fullBotExp },
+    { source: 2, target: 7, value: T.byType.customerRequested },
+    { source: 2, target: 8, value: T.byType.botDecided },
+    { source: 6, target: 9,  value: split(T.outcomes.resolved,   tw.full) },
+    { source: 6, target: 10, value: split(T.outcomes.unresolved, tw.full) },
+    { source: 6, target: 11, value: split(T.outcomes.abandoned,  tw.full) },
+    { source: 6, target: 12, value: split(T.outcomes.unknown,    tw.full) },
+    { source: 7, target: 9,  value: split(T.outcomes.resolved,   tw.cust) },
+    { source: 7, target: 10, value: split(T.outcomes.unresolved, tw.cust) },
+    { source: 7, target: 11, value: split(T.outcomes.abandoned,  tw.cust) },
+    { source: 7, target: 12, value: split(T.outcomes.unknown,    tw.cust) },
+    { source: 8, target: 9,  value: split(T.outcomes.resolved,   tw.bot) },
+    { source: 8, target: 10, value: split(T.outcomes.unresolved, tw.bot) },
+    { source: 8, target: 11, value: split(T.outcomes.abandoned,  tw.bot) },
+    { source: 8, target: 12, value: split(T.outcomes.unknown,    tw.bot) },
+  ];
+
+  const graph = sankeyLayout({
+    nodes: sankeyNodes.map(d => ({ ...d })),
+    links: sankeyLinks.map(d => ({ ...d })),
+  });
+
+  svgG.append('g').selectAll('path').data(graph.links).join('path')
     .attr('class', 'link')
     .attr('d', d3.sankeyLinkHorizontal())
     .attr('stroke',       d => d.source.color)
@@ -966,94 +917,42 @@ svg.append('g')
     .on('mousemove', (event, d) => showTip(event, `
       <div class="tip-title">${d.source.name} → ${d.target.name}</div>
       <div class="tip-count">${fmt(d.value)} calls</div>
-      <div class="tip-pct">${pct(d.value, DATA.total)} of total inbound</div>
-      <div class="tip-of">${pct(d.value, d.source.value)} of "${d.source.name}"</div>
-    `))
+      <div class="tip-pct">${pct(d.value, D.total)} of total inbound</div>
+      <div class="tip-of">${pct(d.value, d.source.value)} of "${d.source.name}"</div>`))
     .on('mouseleave', hideTip);
 
-// ── Nodes
-const node = svg.append('g')
-  .selectAll('g')
-  .data(graph.nodes)
-  .join('g')
+  const node = svgG.append('g').selectAll('g').data(graph.nodes).join('g')
     .attr('transform', d => `translate(${d.x0},${d.y0})`);
 
-node.append('rect')
-  .attr('class', 'node-rect')
-  .attr('width',  d => d.x1 - d.x0)
-  .attr('height', d => Math.max(1, d.y1 - d.y0))
-  .attr('fill',   d => d.color)
-  .attr('rx', 4)
-  .on('mousemove', (event, d) => showTip(event, `
-    <div class="tip-title">${d.name}</div>
-    <div class="tip-count">${fmt(d.value)} calls</div>
-    <div class="tip-pct">${pct(d.value, DATA.total)} of total inbound</div>
-  `))
-  .on('mouseleave', hideTip);
+  node.append('rect')
+    .attr('class', 'node-rect')
+    .attr('width',  d => d.x1 - d.x0)
+    .attr('height', d => Math.max(1, d.y1 - d.y0))
+    .attr('fill',   d => d.color).attr('rx', 4)
+    .on('mousemove', (event, d) => showTip(event, `
+      <div class="tip-title">${d.name}</div>
+      <div class="tip-count">${fmt(d.value)} calls</div>
+      <div class="tip-pct">${pct(d.value, D.total)} of total inbound</div>`))
+    .on('mouseleave', hideTip);
 
-// ── Node labels (right-side anchor for most; left-side for last column)
-const isRightCol = d => d.x0 > W * 0.72;
+  node.append('text')
+    .attr('x', d => isRightCol(d) ? -(d.x1-d.x0)-8 : (d.x1-d.x0)+8)
+    .attr('y', d => (d.y1-d.y0)/2 - 7).attr('dy', '0.35em')
+    .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
+    .attr('fill', '#1e293b').attr('font-size', '12px').attr('font-weight', '700')
+    .text(d => d.name);
 
-node.append('text')
-  .attr('x', d => isRightCol(d) ? -(d.x1 - d.x0) - 8 : (d.x1 - d.x0) + 8)
-  .attr('y', d => (d.y1 - d.y0) / 2 - 7)
-  .attr('dy', '0.35em')
-  .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
-  .attr('fill', '#1e293b')
-  .attr('font-size', '12px')
-  .attr('font-weight', '700')
-  .text(d => d.name);
+  node.append('text')
+    .attr('x', d => isRightCol(d) ? -(d.x1-d.x0)-8 : (d.x1-d.x0)+8)
+    .attr('y', d => (d.y1-d.y0)/2 + 10).attr('dy', '0.35em')
+    .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
+    .attr('fill', '#64748b').attr('font-size', '11px')
+    .text(d => `${fmt(d.value)} · ${pct(d.value, D.total)}`);
+}
 
-node.append('text')
-  .attr('x', d => isRightCol(d) ? -(d.x1 - d.x0) - 8 : (d.x1 - d.x0) + 8)
-  .attr('y', d => (d.y1 - d.y0) / 2 + 10)
-  .attr('dy', '0.35em')
-  .attr('text-anchor', d => isRightCol(d) ? 'end' : 'start')
-  .attr('fill', '#64748b')
-  .attr('font-size', '11px')
-  .text(d => `${fmt(d.value)} · ${pct(d.value, DATA.total)}`);
-
-// ── 8. LEGEND ─────────────────────────────────────────────────────────────
-const LEGEND_GROUPS = [
-  {
-    heading: 'Bot Experience',
-    items: [
-      { color: C.inbound,   label: 'Inbound Calls' },
-      { color: C.contained, label: 'Contained by Bot (no escalation)' },
-      { color: C.transferred, label: 'Transferred to Human Agent' },
-    ],
-  },
-  {
-    heading: 'Transfer Type',
-    items: [
-      { color: C.fullBot,    label: 'Full Bot Experience then transfer' },
-      { color: C.custReq,    label: 'Customer Requested an Agent' },
-      { color: C.botDecided, label: 'Bot Self-Escalated (no answer)' },
-    ],
-  },
-  {
-    heading: 'Outcomes',
-    items: [
-      { color: C.resolved,   label: 'Resolved' },
-      { color: C.unresolved, label: 'Unresolved' },
-      { color: C.abandoned,  label: 'Abandoned / Hung up' },
-      { color: C.unknown,    label: 'Unknown' },
-    ],
-  },
-];
-
-const legendEl = document.getElementById('legend');
-LEGEND_GROUPS.forEach(g => {
-  legendEl.insertAdjacentHTML('beforeend',
-    `<span class="legend-group-label">${g.heading}</span>`);
-  g.items.forEach(item => {
-    legendEl.insertAdjacentHTML('beforeend', `
-      <div class="legend-item">
-        <div class="legend-swatch" style="background:${item.color}"></div>
-        ${item.label}
-      </div>`);
-  });
-});
+// ── 6. INIT & FILTER LISTENER ─────────────────────────────────────────────
+render('all');
+document.getElementById('purposeSelect').addEventListener('change', e => render(e.target.value));
 </script>
 </body>
 </html>
